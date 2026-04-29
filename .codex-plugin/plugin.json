@@ -1,0 +1,45 @@
+{
+  "name": "unreal-plugin-pipeline",
+  "version": "0.1.0",
+  "description": "Configure Unreal Engine plugin release builds for Windows RunUAT packaging.",
+  "author": {
+    "name": "milli",
+    "email": "",
+    "url": ""
+  },
+  "homepage": "https://openai.com/",
+  "repository": "",
+  "license": "MIT",
+  "keywords": [
+    "unreal",
+    "unreal-engine",
+    "ue-plugin",
+    "runuat",
+    "buildplugin",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Unreal Plugin Pipeline",
+    "shortDescription": "Build and package Unreal plugins from Codex",
+    "longDescription": "Windows-first release pipeline for Unreal Engine plugins. It detects local engine installs, writes project-local release tooling, runs BuildPlugin from low to high engine versions, and can launch an automatic Codex release agent with safe full-auto defaults.",
+    "developerName": "milli",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://openai.com/",
+    "privacyPolicyURL": "https://openai.com/policies/privacy-policy/",
+    "termsOfServiceURL": "https://openai.com/policies/terms-of-use/",
+    "defaultPrompt": [
+      "Set up Unreal plugin release packaging here.",
+      "Build this Unreal plugin for all configured UE versions."
+    ],
+    "brandColor": "#1F6FEB",
+    "composerIcon": "./assets/unreal-plugin-pipeline-small.svg",
+    "logo": "./assets/unreal-plugin-pipeline.svg",
+    "screenshots": []
+  }
+}

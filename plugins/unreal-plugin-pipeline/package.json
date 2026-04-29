@@ -1,0 +1,12 @@
+{
+  "name": "unreal-plugin-pipeline",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node tests/unreal-plugin-pipeline.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

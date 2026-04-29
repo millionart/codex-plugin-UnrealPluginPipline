@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Unreal Plugin Pipeline">
+  <rect width="256" height="256" rx="44" fill="#111827"/>
+  <rect x="36" y="52" width="144" height="32" rx="8" fill="#1f6feb"/>
+  <rect x="36" y="112" width="104" height="32" rx="8" fill="#1f6feb"/>
+  <rect x="36" y="172" width="144" height="32" rx="8" fill="#1f6feb"/>
+  <path d="M170 102l50 26-50 26z" fill="#f8d84a"/>
+  <path d="M64 76h80M64 136h48M64 196h80" stroke="#fff" stroke-width="14" stroke-linecap="round"/>
+</svg>

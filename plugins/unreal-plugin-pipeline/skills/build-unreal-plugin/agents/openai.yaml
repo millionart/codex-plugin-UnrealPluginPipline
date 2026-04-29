@@ -1,0 +1,6 @@
+interface:
+  display_name: "Build Plugin"
+  short_description: "Build, fix, and package this Unreal plugin"
+  icon_small: "./assets/unreal-plugin-pipeline-small.svg"
+  icon_large: "./assets/unreal-plugin-pipeline.svg"
+  default_prompt: "Use $build-unreal-plugin to build this Unreal plugin for all configured Unreal Engine versions, fix build failures in this conversation, retry, and package zip outputs."

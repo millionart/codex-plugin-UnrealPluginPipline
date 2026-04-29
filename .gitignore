@@ -1,0 +1,4 @@
+node_modules/
+_UnrealPluginBuilds/
+.plugin-eval/
+npm-debug.log*
