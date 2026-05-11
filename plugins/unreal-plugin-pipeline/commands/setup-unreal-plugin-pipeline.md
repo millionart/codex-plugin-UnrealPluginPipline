@@ -19,7 +19,7 @@ The user invoked this command with: $ARGUMENTS
 3. Confirm the root contains a `.uplugin` descriptor.
 4. Run:
    `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-unreal-plugin-pipeline.ps1 -PipelineCommand setup -ProjectRoot "<project-root>"`
-5. If the user provided an output directory, pass `--output "<dir>"`.
+5. If the user provided an output directory, configure it globally with `set-output --output "<dir>"`.
 6. Report the generated plugin-local `.codex/unreal-plugin-pipeline.json` path. Do not report or create project-local script or runtime copy paths.
 7. Run `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-unreal-plugin-pipeline.ps1 -PipelineCommand detect-engines -ProjectRoot "<project-root>"` so the user can see which versions will build.
 

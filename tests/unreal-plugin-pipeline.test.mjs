@@ -134,7 +134,7 @@ test("discoverUPluginProjectRoots finds plugin roots and ignores generated packa
   );
 });
 
-test("writeProjectBootstrap creates project config without copied scripts or Run actions by default", async () => {
+test("writeProjectBootstrap creates project config without project-local output settings by default", async () => {
   const projectRoot = await tempDir("bootstrap");
   const runtimeSource = path.join(projectRoot, "runtime-source.mjs");
   const dashboardPath = path.join(projectRoot, ".codex", "unreal-plugin-pipeline", "dashboard.html");
@@ -154,7 +154,9 @@ test("writeProjectBootstrap creates project config without copied scripts or Run
   await assert.rejects(stat(path.join(projectRoot, ".codex", "environments", "environment.toml")));
 
   const projectConfig = JSON.parse(await readFile(path.join(projectRoot, ".codex", "unreal-plugin-pipeline.json"), "utf8"));
-  assert.equal(projectConfig.outputDirectory, path.join(projectRoot, "dist"));
+  assert.deepEqual(projectConfig, {
+    excludedVersions: [],
+  });
 
   await assert.rejects(stat(path.join(projectRoot, "script", "unreal_plugin_pipeline.ps1")));
   await assert.rejects(stat(path.join(projectRoot, ".codex", "unreal-plugin-pipeline", "bin", "unreal-plugin-pipeline.mjs")));
@@ -313,7 +315,7 @@ test("generateProjectDashboard writes a visual HTML config panel", async () => {
   assert.equal(boot.state.projectName, "DemoPlugin");
 });
 
-test("saveDashboardConfig writes project and global settings used by the dashboard", async () => {
+test("saveDashboardConfig keeps output and zip settings global-only", async () => {
   const projectRoot = await tempDir("dashboard-save");
   const globalConfigPath = path.join(projectRoot, "global-config.json");
   await writeFile(path.join(projectRoot, "DemoPlugin.uplugin"), "{\"FileVersion\":3}\n", "utf8");
@@ -329,8 +331,9 @@ test("saveDashboardConfig writes project and global settings used by the dashboa
   });
   assert.deepEqual(projectResult.projectConfig.excludedVersions, ["5.2", "5.7"]);
   const projectConfig = JSON.parse(await readFile(path.join(projectRoot, ".codex", "unreal-plugin-pipeline.json"), "utf8"));
-  assert.equal(projectConfig.outputDirectory, path.join(projectRoot, "release"));
-  assert.deepEqual(projectConfig.excludedVersions, ["5.2", "5.7"]);
+  assert.deepEqual(projectConfig, {
+    excludedVersions: ["5.2", "5.7"],
+  });
 
   const globalResult = await saveDashboardConfig({
     projectRoot,
@@ -441,10 +444,12 @@ test("startDashboardServer serves the editable dashboard and saves project confi
     });
     assert.equal(save.status, 200);
     const payload = await save.json();
-    assert.equal(payload.state.projectConfig.outputDirectory, path.join(projectRoot, "server-release"));
+    assert.equal(payload.state.projectConfig.outputDirectory, undefined);
 
     const projectConfig = JSON.parse(await readFile(path.join(projectRoot, ".codex", "unreal-plugin-pipeline.json"), "utf8"));
-    assert.deepEqual(projectConfig.excludedVersions, ["5.3"]);
+    assert.deepEqual(projectConfig, {
+      excludedVersions: ["5.3"],
+    });
   } finally {
     await new Promise((resolve) => session.server.close(resolve));
   }

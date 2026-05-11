@@ -33,9 +33,7 @@ const DEFAULT_GLOBAL_CONFIG = {
 };
 
 const DEFAULT_PROJECT_CONFIG = {
-  outputDirectory: "",
   excludedVersions: [],
-  zipNamePattern: "{pluginName}-UE{engineVersion}.zip",
 };
 
 function uniq(values) {
@@ -410,12 +408,9 @@ function optionalResolvedPath(value, baseDirectory = process.cwd()) {
 
 function sanitizeProjectConfigInput(config, previousConfig, projectRoot) {
   const previous = { ...DEFAULT_PROJECT_CONFIG, ...previousConfig };
+  void projectRoot;
   return {
-    ...previous,
-    outputDirectory: optionalResolvedPath(config.outputDirectory ?? previous.outputDirectory, projectRoot),
     excludedVersions: normalizeVersionList(config.excludedVersions ?? previous.excludedVersions),
-    zipNamePattern: String(config.zipNamePattern || previous.zipNamePattern || DEFAULT_PROJECT_CONFIG.zipNamePattern).trim()
-      || DEFAULT_PROJECT_CONFIG.zipNamePattern,
   };
 }
 
@@ -662,12 +657,9 @@ export async function writeProjectBootstrap({
   await mkdir(codexDir, { recursive: true });
   await removeDirectoryIfExists(legacyRuntimeDir);
 
+  void outputDirectory;
   const existingProjectConfig = await readJsonIfExists(projectConfigPath, DEFAULT_PROJECT_CONFIG);
-  const nextProjectConfig = {
-    ...DEFAULT_PROJECT_CONFIG,
-    ...existingProjectConfig,
-    outputDirectory: outputDirectory || existingProjectConfig.outputDirectory || path.join(resolvedProjectRoot, "_UnrealPluginBuilds"),
-  };
+  const nextProjectConfig = sanitizeProjectConfigInput(existingProjectConfig, DEFAULT_PROJECT_CONFIG, resolvedProjectRoot);
   await writeJson(projectConfigPath, nextProjectConfig);
 
   const writeEnvironment = async ({ targetPath, environmentName, includeProjectName }) => {
@@ -788,7 +780,8 @@ function applyPathTemplate(value, { pluginName = "" } = {}) {
 }
 
 function resolveOutputDirectory(projectRoot, globalConfig, projectConfig, pluginName = "") {
-  const configuredDirectory = globalConfig.outputDirectory || projectConfig.outputDirectory || path.join(projectRoot, "_UnrealPluginBuilds");
+  void projectConfig;
+  const configuredDirectory = globalConfig.outputDirectory || path.join(projectRoot, "_UnrealPluginBuilds");
   return path.resolve(applyPathTemplate(configuredDirectory, { pluginName }));
 }
 
@@ -1385,7 +1378,7 @@ function makeDashboardHtml({ state, apiBase = "", apiToken = "" }) {
               </div>
             </label>
             <label>Zip Name Pattern
-              <input id="globalZipPattern" autocomplete="off" value="${htmlEscape(state.globalConfig.zipNamePattern || state.projectConfig.zipNamePattern || DEFAULT_GLOBAL_CONFIG.zipNamePattern)}">
+              <input id="globalZipPattern" autocomplete="off" value="${htmlEscape(state.globalConfig.zipNamePattern || DEFAULT_GLOBAL_CONFIG.zipNamePattern)}">
             </label>
           </div>
           <div class="form-row">
@@ -1630,7 +1623,7 @@ function makeDashboardHtml({ state, apiBase = "", apiToken = "" }) {
         document.getElementById("globalScanRoots").value = (state.globalConfig.engineScanRoots || []).join("\\n");
         document.getElementById("globalEngineRoots").value = (state.globalConfig.engineRoots || []).join("\\n");
         document.getElementById("globalOutput").value = state.globalConfig.outputDirectory || "";
-        document.getElementById("globalZipPattern").value = state.globalConfig.zipNamePattern || state.projectConfig.zipNamePattern || "{pluginName}-UE{engineVersion}.zip";
+        document.getElementById("globalZipPattern").value = state.globalConfig.zipNamePattern || "{pluginName}-UE{engineVersion}.zip";
         document.getElementById("globalMaxFix").value = state.globalConfig.maxFixAttemptsPerVersion || 3;
         document.getElementById("globalDanger").checked = Boolean(state.globalConfig.allowDangerFullAccess);
       }
@@ -2396,7 +2389,7 @@ async function buildWithRunUat({ projectRoot, engine, projectConfig, globalConfi
   const zipDir = path.join(outputRoot, "zips");
   const logPath = buildLogPath({ outputDirectory: outputRoot, pluginName, engineVersion: engine.version });
   const uatLogDirectory = buildUatLogDirectory({ outputDirectory: outputRoot, engineVersion: engine.version });
-  const zipName = (globalConfig.zipNamePattern || projectConfig.zipNamePattern || DEFAULT_GLOBAL_CONFIG.zipNamePattern)
+  const zipName = (globalConfig.zipNamePattern || DEFAULT_GLOBAL_CONFIG.zipNamePattern)
     .replaceAll("{pluginName}", pluginName)
     .replaceAll("{engineVersion}", engine.version);
   const zipPath = path.join(zipDir, zipName);
@@ -2495,14 +2488,6 @@ async function updateGlobalConfig(mutator) {
   const next = mutator(config);
   await writeJson(GLOBAL_CONFIG_PATH, next);
   return next;
-}
-
-async function setProjectOutput(projectRoot, outputDirectory) {
-  const configPath = path.join(projectRoot, PROJECT_CONFIG_RELATIVE);
-  const config = await loadProjectConfig(projectRoot);
-  config.outputDirectory = path.resolve(outputDirectory);
-  await writeJson(configPath, config);
-  return config;
 }
 
 async function updateProjectConfig(projectRoot, mutator) {
@@ -2622,13 +2607,8 @@ async function main(argv) {
   if (command === "set-output") {
     const outputDirectory = readOption(args, "--output");
     if (!outputDirectory) throw new Error("set-output requires --output <directory>");
-    if (hasFlag(args, "--global")) {
-      const next = await updateGlobalConfig((config) => ({ ...config, outputDirectory: path.resolve(outputDirectory) }));
-      console.log(JSON.stringify(next, null, 2));
-    } else {
-      const next = await setProjectOutput(projectRoot, outputDirectory);
-      console.log(JSON.stringify(next, null, 2));
-    }
+    const next = await updateGlobalConfig((config) => ({ ...config, outputDirectory: path.resolve(outputDirectory) }));
+    console.log(JSON.stringify(next, null, 2));
     return 0;
   }
 
@@ -2682,7 +2662,7 @@ Commands:
   dashboard --project-root <dir> [--no-open]
   dashboard-server --project-root <dir> --port <port> --token <token>
   show-config --project-root <dir>
-  set-output --project-root <dir> --output <dir> [--global]
+  set-output --output <dir>
   add-scan-root --root <dir>
   add-engine-root --root <dir>
   exclude-version --project-root <dir> --version <version> [--global]

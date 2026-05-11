@@ -14,7 +14,7 @@ Global settings live at `%USERPROFILE%\.unreal-plugin-pipeline\config.json`.
 
 Project settings live at `<plugin-root>\.codex\unreal-plugin-pipeline.json`.
 
-Both may define output directory overrides and excluded Unreal Engine versions. Engine discovery uses configured scan roots and explicit engine roots. Engine roots are valid when they contain `Engine\Build\BatchFiles\RunUAT.bat`.
+The global config defines output directory and zip naming for centralized artifact management. Both global and project config may define excluded Unreal Engine versions. Engine discovery uses configured scan roots and explicit engine roots. Engine roots are valid when they contain `Engine\Build\BatchFiles\RunUAT.bat`.
 
 ## Architecture
 

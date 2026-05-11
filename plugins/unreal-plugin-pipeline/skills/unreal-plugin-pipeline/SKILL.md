@@ -33,11 +33,8 @@ Do not claim this plugin can create an independent Codex desktop toolbar button.
      `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-unreal-plugin-pipeline.ps1 -PipelineCommand add-scan-root --root "D:\Epic\Epic Games"`
    - Add a single engine root:
      `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-unreal-plugin-pipeline.ps1 -PipelineCommand add-engine-root --root "D:\Epic\Epic Games\UE_5.7"`
-3. Set output storage if the user wants a custom location:
-   - Project default:
-     `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-unreal-plugin-pipeline.ps1 -PipelineCommand set-output -ProjectRoot "<project>" --output "D:\Builds\MyPlugin"`
-   - Global default:
-     `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-unreal-plugin-pipeline.ps1 -PipelineCommand set-output --global --output "D:\UnrealPluginBuilds"`
+3. Set global output storage if the user wants a custom location:
+   `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-unreal-plugin-pipeline.ps1 -PipelineCommand set-output --output "D:\UnrealPluginBuilds\{pluginName}"`
 4. Exclude or re-include versions when requested:
    - Project exclusion:
      `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-unreal-plugin-pipeline.ps1 -PipelineCommand exclude-version -ProjectRoot "<project>" --version 5.1`
@@ -104,7 +101,7 @@ Project config:
 
 `<plugin-root>\.codex\unreal-plugin-pipeline.json`
 
-The project config overrides global output directory and can exclude versions for one project. Both configs can exclude versions.
+Output directory and zip name pattern are global-only settings so all plugin build artifacts are managed in one place. Project config can exclude versions for one project. Both configs can exclude versions.
 
 ## Guardrails
 

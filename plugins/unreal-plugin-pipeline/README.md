@@ -93,8 +93,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\invoke-unreal-plug
 Configure output storage:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\invoke-unreal-plugin-pipeline.ps1 -PipelineCommand set-output -ProjectRoot "D:\Path\To\MyPlugin" --output "D:\Builds\MyPlugin"
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\invoke-unreal-plugin-pipeline.ps1 -PipelineCommand set-output --global --output "D:\UnrealPluginBuilds"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\invoke-unreal-plugin-pipeline.ps1 -PipelineCommand set-output --output "D:\UnrealPluginBuilds\{pluginName}"
 ```
 
 Exclude or re-include versions:

@@ -191,16 +191,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\invoke-unreal-plug
 
 ## 输出目录
 
-设置项目级输出目录：
+设置全局输出目录：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\invoke-unreal-plugin-pipeline.ps1 -PipelineCommand set-output -ProjectRoot "D:\Path\To\MyPlugin" --output "D:\Builds\MyPlugin"
-```
-
-设置全局默认输出目录：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\invoke-unreal-plugin-pipeline.ps1 -PipelineCommand set-output --global --output "D:\UnrealPluginBuilds"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\invoke-unreal-plugin-pipeline.ps1 -PipelineCommand set-output --output "D:\UnrealPluginBuilds\{pluginName}"
 ```
 
 构建日志和报告写入输出目录：
@@ -226,7 +220,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\invoke-unreal-plug
 <plugin-root>\.codex\unreal-plugin-pipeline.json
 ```
 
-项目配置会覆盖全局输出目录，也可以只为当前插件排除某些 Unreal Engine 版本。
+输出目录和 zip 命名规则只保存在全局配置中，便于统一管理所有插件构建产物。项目配置可以只为当前插件排除某些 Unreal Engine 版本。
 
 ## Run Dropdown 兼容模式
 

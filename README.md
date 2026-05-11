@@ -191,16 +191,10 @@ Add `--global` to write the version exclusion rule to global config.
 
 ## Output Directory
 
-Set a project-level output directory:
+Set the global output directory:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\invoke-unreal-plugin-pipeline.ps1 -PipelineCommand set-output -ProjectRoot "D:\Path\To\MyPlugin" --output "D:\Builds\MyPlugin"
-```
-
-Set the global default output directory:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\invoke-unreal-plugin-pipeline.ps1 -PipelineCommand set-output --global --output "D:\UnrealPluginBuilds"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\invoke-unreal-plugin-pipeline.ps1 -PipelineCommand set-output --output "D:\UnrealPluginBuilds\{pluginName}"
 ```
 
 Build logs and reports are written under the output directory:
@@ -226,7 +220,7 @@ Project config:
 <plugin-root>\.codex\unreal-plugin-pipeline.json
 ```
 
-Project config overrides the global output directory and can exclude Unreal Engine versions for one plugin.
+Output directory and zip name pattern are global-only settings so all plugin build artifacts are managed in one place. Project config can exclude Unreal Engine versions for one plugin.
 
 ## Run Dropdown Compatibility Mode
 
@@ -305,4 +299,3 @@ This keeps maintenance aligned with the way the plugin is used: use Codex to dia
 - This repository is Windows-first; do not describe cross-platform support as available.
 - Add a root `LICENSE` file before public release if needed; plugin metadata currently declares MIT.
 - If the repository path or name changes, update local marketplace path examples.
-
