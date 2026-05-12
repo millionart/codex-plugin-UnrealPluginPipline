@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -21,6 +21,8 @@ import {
   makeReleasePrompt,
   removeProjectRunActions,
   releaseReportPath,
+  releaseAgentMode,
+  validateFabPluginZipEntries,
   resolveCodexExecutable,
   resolveBuildPlan,
   runUatProcessInvocation,
@@ -833,6 +835,27 @@ test("buildCodexExecArgs uses full-auto workspace-write without dangerous sandbo
   assert.equal(args.includes("--dangerously-bypass-approvals-and-sandbox"), false);
 });
 
+test("releaseAgentMode keeps build in the current Codex Desktop session", () => {
+  assert.equal(
+    releaseAgentMode({
+      env: {
+        CODEX_INTERNAL_ORIGINATOR_OVERRIDE: "Codex Desktop",
+        CODEX_THREAD_ID: "019e1a2e-f5cc-7561-9551-de79c40af721",
+      },
+    }),
+    "current-session",
+  );
+
+  assert.equal(
+    releaseAgentMode({
+      env: {
+        CODEX_SHELL: "1",
+      },
+    }),
+    "codex-exec",
+  );
+});
+
 test("codexSandboxWritableDirs adds only Unreal user-state directories", () => {
   assert.deepEqual(codexSandboxWritableDirs({
     env: {
@@ -1066,4 +1089,53 @@ test("copyReleasePackageForZip excludes generated folders and includes FilterPlu
   await assert.rejects(stat(path.join(staging, "Binaries", "Win64", "UnrealEditor-DiffPlus.pdb")));
   await assert.rejects(stat(path.join(staging, "Binaries", "Win64", "ExtraSymbols.PDB")));
   await assert.rejects(stat(path.join(staging, "Intermediate", "Build", "UnrealEditor-DiffPlus.lib")));
+});
+
+test("validateFabPluginZipEntries requires one plugin root and no generated folders", () => {
+  assert.deepEqual(
+    validateFabPluginZipEntries({
+      pluginName: "DiffPlus",
+      entries: [
+        "DiffPlus/DiffPlus.uplugin",
+        "DiffPlus/Config/FilterPlugin.ini",
+        "DiffPlus/Documentation/README.md",
+        "DiffPlus/Resources/Icon128.png",
+        "DiffPlus/Source/DiffPlus/DiffPlus.Build.cs",
+      ],
+    }),
+    [],
+  );
+
+  assert.deepEqual(
+    validateFabPluginZipEntries({
+      pluginName: "DiffPlus",
+      entries: [
+        "DiffPlus.uplugin",
+        "Source/DiffPlus/DiffPlus.Build.cs",
+        "Binaries/Win64/UnrealEditor-DiffPlus.dll",
+        "Intermediate/Build/DiffPlus.lib",
+      ],
+    }),
+    [
+      "Zip must contain exactly one root folder named DiffPlus.",
+      "Zip must include DiffPlus/DiffPlus.uplugin.",
+      "Zip includes generated folder Binaries: Binaries/Win64/UnrealEditor-DiffPlus.dll",
+      "Zip includes generated folder Intermediate: Intermediate/Build/DiffPlus.lib",
+    ],
+  );
+});
+
+test("versioned release staging nests the plugin folder as the zip root", async () => {
+  const root = await tempDir("release-staging-root");
+  const source = path.join(root, "packages", "DiffPlus-UE5.7");
+  const stagingRoot = path.join(root, "zip-staging", "DiffPlus-UE5.7");
+  const stagingPlugin = path.join(stagingRoot, "DiffPlus");
+  await mkdir(path.join(source, "Source", "DiffPlus"), { recursive: true });
+  await writeFile(path.join(source, "DiffPlus.uplugin"), "{\"Modules\":[]}\n", "utf8");
+  await writeFile(path.join(source, "Source", "DiffPlus", "DiffPlus.Build.cs"), "build", "utf8");
+
+  await copyReleasePackageForZip({ sourceDir: source, stagingDir: stagingPlugin, projectRoot: "", pluginName: "DiffPlus" });
+
+  assert.deepEqual(await readdir(stagingRoot), ["DiffPlus"]);
+  await stat(path.join(stagingRoot, "DiffPlus", "DiffPlus.uplugin"));
 });

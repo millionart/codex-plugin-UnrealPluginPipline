@@ -2307,6 +2307,18 @@ async function runCodexReleaseAgent(projectRoot) {
     outputDirectory,
     maxFixAttempts: globalConfig.maxFixAttemptsPerVersion || 3,
   });
+
+  if (releaseAgentMode() === "current-session") {
+    return await runCurrentSessionReleaseAgent({
+      projectRoot,
+      outputDirectory,
+      globalConfig,
+      projectConfig,
+      plan,
+      prompt,
+    });
+  }
+
   const codexExecutable = await resolveCodexExecutable();
   if (!codexExecutable) {
     throw new Error(codexCliUnavailableMessage());
@@ -2327,6 +2339,14 @@ async function runCodexReleaseAgent(projectRoot) {
   return result.status || 0;
 }
 
+export function releaseAgentMode({ env = process.env } = {}) {
+  const originator = String(env.CODEX_INTERNAL_ORIGINATOR_OVERRIDE || "");
+  if (originator.toLowerCase().includes("codex desktop")) {
+    return "current-session";
+  }
+  return "codex-exec";
+}
+
 function pluginNameFromDescriptor(descriptorPath) {
   return path.basename(descriptorPath, ".uplugin");
 }
@@ -2336,14 +2356,73 @@ async function removeDirectoryIfExists(directory) {
   await import("node:fs/promises").then((fs) => fs.rm(directory, { recursive: true, force: true }));
 }
 
+const GENERATED_PLUGIN_FOLDERS = new Set(["Binaries", "Build", "Intermediate", "Saved"]);
+
 function shouldIncludeInReleaseZip(filePath) {
   const normalized = String(filePath || "");
   const segments = normalized.split(/[\\/]+/);
-  if (segments.some((segment) => ["Binaries", "Build", "Intermediate", "Saved"].includes(segment))) {
+  if (segments.some((segment) => GENERATED_PLUGIN_FOLDERS.has(segment))) {
     return false;
   }
 
   return path.extname(normalized).toLowerCase() !== ".pdb";
+}
+
+export function validateFabPluginZipEntries({ pluginName, entries = [] } = {}) {
+  const normalizedPluginName = String(pluginName || "").trim();
+  const normalizedEntries = entries
+    .map((entry) => String(entry || "").replaceAll("\\", "/").replace(/^\/+/, ""))
+    .filter(Boolean);
+  const issues = [];
+  const roots = new Set(normalizedEntries.map((entry) => entry.split("/")[0]).filter(Boolean));
+
+  if (roots.size !== 1 || !roots.has(normalizedPluginName)) {
+    issues.push(`Zip must contain exactly one root folder named ${normalizedPluginName}.`);
+  }
+
+  if (!normalizedEntries.includes(`${normalizedPluginName}/${normalizedPluginName}.uplugin`)) {
+    issues.push(`Zip must include ${normalizedPluginName}/${normalizedPluginName}.uplugin.`);
+  }
+
+  for (const entry of normalizedEntries) {
+    const segments = entry.split("/");
+    for (const segment of segments) {
+      if (GENERATED_PLUGIN_FOLDERS.has(segment)) {
+        issues.push(`Zip includes generated folder ${segment}: ${entry}`);
+        break;
+      }
+    }
+    if (path.posix.extname(entry).toLowerCase() === ".pdb") {
+      issues.push(`Zip includes debug symbol file: ${entry}`);
+    }
+  }
+
+  return issues;
+}
+
+async function collectRelativeFilePaths(rootDir, currentDir = rootDir) {
+  const entries = await readdir(currentDir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const fullPath = path.join(currentDir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await collectRelativeFilePaths(rootDir, fullPath));
+    } else if (entry.isFile()) {
+      files.push(path.relative(rootDir, fullPath));
+    }
+  }
+  return files;
+}
+
+async function assertFabReadyStaging({ stagingRoot, pluginName }) {
+  const entries = await collectRelativeFilePaths(stagingRoot);
+  const issues = validateFabPluginZipEntries({ pluginName, entries });
+  if (issues.length > 0) {
+    throw new Error([
+      "Release zip staging failed Fab TRC validation.",
+      ...issues.map((issue) => `- ${issue}`),
+    ].join("\n"));
+  }
 }
 
 async function copyFilterPluginConfigForZip({ projectRoot, stagingDir }) {
@@ -2431,7 +2510,8 @@ async function buildWithRunUat({ projectRoot, engine, projectConfig, globalConfi
   const pluginName = pluginNameFromDescriptor(descriptor);
   const outputRoot = resolveOutputDirectory(projectRoot, globalConfig, projectConfig, pluginName);
   const packageDir = path.join(outputRoot, "packages", `${pluginName}-UE${engine.version}`);
-  const zipStagingDir = path.join(outputRoot, "zip-staging", `${pluginName}-UE${engine.version}`);
+  const zipStagingRoot = path.join(outputRoot, "zip-staging", `${pluginName}-UE${engine.version}`);
+  const zipStagingPluginDir = path.join(zipStagingRoot, pluginName);
   const zipDir = path.join(outputRoot, "zips");
   const logPath = buildLogPath({ outputDirectory: outputRoot, pluginName, engineVersion: engine.version });
   const uatLogDirectory = buildUatLogDirectory({ outputDirectory: outputRoot, engineVersion: engine.version });
@@ -2480,8 +2560,10 @@ async function buildWithRunUat({ projectRoot, engine, projectConfig, globalConfi
   }
 
   await removeDirectoryIfExists(zipPath);
-  await copyReleasePackageForZip({ sourceDir: packageDir, stagingDir: zipStagingDir, projectRoot, pluginName });
-  const zipInvocation = zipDirectoryProcessInvocation(zipStagingDir, zipPath);
+  await removeDirectoryIfExists(zipStagingRoot);
+  await copyReleasePackageForZip({ sourceDir: packageDir, stagingDir: zipStagingPluginDir, projectRoot, pluginName });
+  await assertFabReadyStaging({ stagingRoot: zipStagingRoot, pluginName });
+  const zipInvocation = zipDirectoryProcessInvocation(zipStagingRoot, zipPath);
   const compress = spawnSync(zipInvocation.command, zipInvocation.args, {
     cwd: projectRoot,
     stdio: "inherit",
@@ -2493,7 +2575,7 @@ async function buildWithRunUat({ projectRoot, engine, projectConfig, globalConfi
     throw new Error(`Zip creation failed for UE ${engine.version} with exit code ${compress.status}`);
   }
 
-  await removeDirectoryIfExists(zipStagingDir);
+  await removeDirectoryIfExists(zipStagingRoot);
   return { engineVersion: engine.version, packageDir, zipPath, logPath };
 }
 
@@ -2510,6 +2592,103 @@ async function runBuildOnly(projectRoot, engineVersion = "") {
     results.push(await buildWithRunUat({ projectRoot, engine, projectConfig, globalConfig }));
   }
   console.log(JSON.stringify({ builds: results }, null, 2));
+}
+
+function releaseReportText({
+  projectRoot,
+  outputDirectory,
+  results = [],
+  blockedVersion = "",
+  blocker = null,
+  mode = "current-session",
+}) {
+  const lines = [
+    "# Unreal Plugin Pipeline Release Report",
+    "",
+    `Date: ${new Date().toISOString().slice(0, 10)}`,
+    `Project root: ${projectRoot}`,
+    `Output directory: ${outputDirectory}`,
+    `Mode: ${mode}`,
+    "",
+    "## Build Results",
+    "",
+  ];
+
+  if (results.length === 0) {
+    lines.push("No engine versions completed successfully.", "");
+  } else {
+    lines.push("| Engine | Result | Zip |", "| --- | --- | --- |");
+    for (const result of results) {
+      lines.push(`| UE ${result.engineVersion} | Success | ${result.zipPath} |`);
+    }
+    lines.push("");
+  }
+
+  if (blocker) {
+    lines.push(
+      "## Current Blocker",
+      "",
+      `UE ${blockedVersion} failed and needs current-session AI repair before continuing.`,
+      "",
+      "```text",
+      blocker.stack || blocker.message || String(blocker),
+      "```",
+      "",
+    );
+  } else {
+    lines.push("## Current Blocker", "", "None.", "");
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+async function writeReleaseReport(outputDirectory, payload) {
+  const reportPath = releaseReportPath(outputDirectory);
+  await mkdir(path.dirname(reportPath), { recursive: true });
+  await writeFile(reportPath, releaseReportText(payload), "utf8");
+  return reportPath;
+}
+
+async function runCurrentSessionReleaseAgent({
+  projectRoot,
+  outputDirectory,
+  globalConfig,
+  projectConfig,
+  plan,
+  prompt,
+}) {
+  console.log("[unreal-plugin-pipeline] Codex Desktop detected; using current-session release loop.");
+  console.log("[unreal-plugin-pipeline] The release-agent instructions for this thread are:");
+  console.log(prompt);
+
+  const results = [];
+  for (const engine of plan) {
+    try {
+      results.push(await buildWithRunUat({ projectRoot, engine, projectConfig, globalConfig }));
+    } catch (error) {
+      const reportPath = await writeReleaseReport(outputDirectory, {
+        projectRoot,
+        outputDirectory,
+        results,
+        blockedVersion: engine.version,
+        blocker: error,
+      });
+      throw new Error([
+        `UE ${engine.version} failed during current-session release build.`,
+        `Report: ${reportPath}`,
+        "Inspect the generated logs, fix the plugin in this Codex thread, then rerun the same build command.",
+        error.stack || error.message,
+      ].filter(Boolean).join("\n"));
+    }
+  }
+
+  const reportPath = await writeReleaseReport(outputDirectory, {
+    projectRoot,
+    outputDirectory,
+    results,
+  });
+  console.log(JSON.stringify({ builds: results, reportPath }, null, 2));
+  return 0;
 }
 
 function readOption(args, name, fallback = "") {

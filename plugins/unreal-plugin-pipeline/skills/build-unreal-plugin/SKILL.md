@@ -7,6 +7,8 @@ description: Build and package the current Windows Unreal Engine plugin across c
 
 Use this skill for the primary release build entry point. It is intended to behave like a current-conversation action button: do the work in this thread, do not spawn a new Codex conversation, and do not use `.codex/environments/environment.toml`.
 
+The shell `build` command mirrors this intent in Codex Desktop: it detects the desktop session and keeps the release loop visible to the current conversation instead of starting a nested `codex exec` session.
+
 ## Workflow
 
 1. Find the target `.uplugin` under the current workspace.

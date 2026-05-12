@@ -4,7 +4,7 @@ Windows-first Codex plugin for Unreal Engine plugin release builds.
 
 It sets up project-local release tooling for a `.uplugin` project:
 
-- `Build`: starts a full-auto Codex release agent.
+- `Build`: runs the release workflow. In Codex Desktop it keeps the loop in the current conversation; outside Codex Desktop it starts a full-auto Codex release agent.
 - `Build Only`: runs direct `RunUAT.bat BuildPlugin`.
 - `Detect Engines`: shows detected Unreal Engine installs and the filtered build order.
 - `Show Config`: opens a local dashboard for engine selection, commands, and editable global/project settings.
@@ -121,7 +121,7 @@ Project config:
 
 The generated `Show Config` Run action launches the plugin bundle's `dashboard` command through hidden PowerShell. It opens a local editable panel in the default browser and also refreshes the fallback `dashboard.html` file.
 
-The `Build` command launches:
+Outside Codex Desktop, the `Build` command launches:
 
 ```text
 codex exec --full-auto --sandbox workspace-write -c approval_policy="never"
@@ -137,6 +137,8 @@ It adds only the configured output directory, Unreal Engine roots, and Unreal-re
 
 It does not use `--dangerously-bypass-approvals-and-sandbox`.
 
+Inside Codex Desktop, `Build` does not spawn a second Codex process. It detects the desktop session, keeps the release loop visible in the current conversation, writes `<output-directory>\reports\last-release-report.md`, and stops on the failed engine version so the current Codex agent can inspect logs, patch, retry, and continue.
+
 Pipeline logs and release reports are written under the configured output directory:
 
 ```text
@@ -146,7 +148,7 @@ Pipeline logs and release reports are written under the configured output direct
 
 They are not written under the plugin project's `.codex` directory.
 
-`Build` requires the standalone Codex CLI to be runnable from PowerShell. Install it with `npm install -g @openai/codex` and verify `codex --version` before using the agent build command. The Codex app's protected WindowsApps resource is not a usable `codex exec` CLI; use `Build Only` when you want direct Unreal packaging without a Codex agent.
+Outside Codex Desktop, `Build` requires the standalone Codex CLI to be runnable from PowerShell. Install it with `npm install -g @openai/codex` and verify `codex --version` before using the agent build command. The Codex app's protected WindowsApps resource is not a usable `codex exec` CLI; use `Build Only` when you want direct Unreal packaging without a Codex agent.
 
 ## Tests
 

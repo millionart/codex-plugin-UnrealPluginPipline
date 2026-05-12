@@ -59,7 +59,7 @@ Setup writes the project config only. It does not copy scripts, wrappers, or run
 
 Project commands:
 
-- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-unreal-plugin-pipeline.ps1 -PipelineCommand build -ProjectRoot "<project>"`: launches the automatic Codex release agent through `codex exec --full-auto`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-unreal-plugin-pipeline.ps1 -PipelineCommand build -ProjectRoot "<project>"`: runs the automatic release workflow. In Codex Desktop it stays in the current conversation release loop; outside Codex Desktop it launches the automatic Codex release agent through `codex exec --full-auto`.
 - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-unreal-plugin-pipeline.ps1 -PipelineCommand build-only -ProjectRoot "<project>"`: runs direct `RunUAT.bat BuildPlugin` packaging without an agent fix loop.
 - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-unreal-plugin-pipeline.ps1 -PipelineCommand detect-engines -ProjectRoot "<project>"`: prints detected engines and the filtered build order.
 - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-unreal-plugin-pipeline.ps1 -PipelineCommand dashboard -ProjectRoot "<project>"`: opens a local dashboard for project details, engine checkboxes, copyable commands, and editable project/global config forms.
@@ -72,7 +72,11 @@ When the current workspace contains several sibling plugins, `install` must pass
 
 ## Release Agent Behavior
 
-The `Build` command runs this plugin bundle's Node script with `--project-root`. The script launches `codex exec` with:
+The `Build` command runs this plugin bundle's Node script with `--project-root`.
+
+In Codex Desktop, the script does not spawn a new Codex conversation. It detects the desktop session, prints the current-thread release-agent instructions, runs direct `BuildPlugin` packaging from low engine version to high engine version, and writes `<output-directory>\reports\last-release-report.md`. If a version fails, the command stops with the log/report path so the current Codex conversation can inspect the error, edit the plugin, retry the same version, and continue.
+
+Outside Codex Desktop, the script launches `codex exec` with:
 
 - `--full-auto`
 - `--sandbox workspace-write`

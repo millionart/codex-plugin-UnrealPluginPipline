@@ -73,14 +73,14 @@ macOS and Linux are not supported in this version. This plugin also cannot creat
 - One or more Unreal Engine installs with `Engine\Build\BatchFiles\RunUAT.bat`
 - A target Unreal plugin project with a `.uplugin` file in the project root
 
-Codex agent build mode also requires the standalone Codex CLI:
+Codex agent build mode outside Codex Desktop also requires the standalone Codex CLI:
 
 ```powershell
 npm install -g @openai/codex
 codex --version
 ```
 
-The Codex Desktop WindowsApps resource is not a usable `codex exec` CLI for this pipeline. If you only want direct Unreal packaging, use `build-only`.
+The Codex Desktop WindowsApps resource is not a usable `codex exec` CLI for this pipeline. Inside Codex Desktop, `build` detects the desktop session and keeps the release loop in the current conversation instead of spawning a nested Codex session. If you only want direct Unreal packaging, use `build-only`.
 
 ## Install as a Local Codex Plugin
 
@@ -248,7 +248,7 @@ They do not modify a parent workspace `.codex\environments\environment.toml`.
 
 ## Safety Defaults
 
-`Build` agent mode starts:
+Outside Codex Desktop, `Build` agent mode starts:
 
 ```text
 codex exec --full-auto --sandbox workspace-write -c approval_policy="never"
@@ -264,6 +264,8 @@ It only adds necessary paths through `--add-dir`, including:
   - `%LOCALAPPDATA%\Microsoft SDKs`
 
 The pipeline does not use `--dangerously-bypass-approvals-and-sandbox`.
+
+Inside Codex Desktop, `Build` does not spawn a second Codex process. It runs the visible release loop in the current conversation, writes `<output-directory>\reports\last-release-report.md`, and stops on the failed engine version so the current Codex agent can inspect logs, patch the project, retry, and continue.
 
 When a build fails, the Codex agent should read logs under the output directory, patch the current project, retry the failed version, then continue with later versions. It should not reset or revert user changes.
 
