@@ -2337,16 +2337,62 @@ async function removeDirectoryIfExists(directory) {
 }
 
 function shouldIncludeInReleaseZip(filePath) {
-  return path.extname(String(filePath || "")).toLowerCase() !== ".pdb";
+  const normalized = String(filePath || "");
+  const segments = normalized.split(/[\\/]+/);
+  if (segments.some((segment) => ["Binaries", "Build", "Intermediate", "Saved"].includes(segment))) {
+    return false;
+  }
+
+  return path.extname(normalized).toLowerCase() !== ".pdb";
 }
 
-export async function copyReleasePackageForZip({ sourceDir, stagingDir }) {
+async function copyFilterPluginConfigForZip({ projectRoot, stagingDir }) {
+  if (!projectRoot) return;
+
+  const source = path.join(projectRoot, "Config", "FilterPlugin.ini");
+  if (!(await exists(source))) return;
+
+  await mkdir(path.join(stagingDir, "Config"), { recursive: true });
+  await cp(source, path.join(stagingDir, "Config", "FilterPlugin.ini"));
+}
+
+async function restoreDescriptorPlatformListsForZip({ projectRoot, stagingDir, pluginName }) {
+  if (!projectRoot || !pluginName) return;
+
+  const sourceDescriptorPath = path.join(projectRoot, `${pluginName}.uplugin`);
+  const stagedDescriptorPath = path.join(stagingDir, `${pluginName}.uplugin`);
+  if (!(await exists(sourceDescriptorPath)) || !(await exists(stagedDescriptorPath))) return;
+
+  const sourceDescriptor = JSON.parse(await readFile(sourceDescriptorPath, "utf8"));
+  const stagedDescriptor = JSON.parse(await readFile(stagedDescriptorPath, "utf8"));
+  const sourceModules = new Map((sourceDescriptor.Modules || []).map((module) => [module.Name, module]));
+  let changed = false;
+
+  for (const stagedModule of stagedDescriptor.Modules || []) {
+    const sourceModule = sourceModules.get(stagedModule.Name);
+    if (!sourceModule) continue;
+    for (const key of ["PlatformAllowList", "PlatformDenyList"]) {
+      if (sourceModule[key] && !stagedModule[key]) {
+        stagedModule[key] = sourceModule[key];
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) {
+    await writeFile(stagedDescriptorPath, `${JSON.stringify(stagedDescriptor, null, "\t")}\n`, "utf8");
+  }
+}
+
+export async function copyReleasePackageForZip({ sourceDir, stagingDir, projectRoot, pluginName }) {
   await removeDirectoryIfExists(stagingDir);
   await mkdir(path.dirname(stagingDir), { recursive: true });
   await cp(sourceDir, stagingDir, {
     recursive: true,
     filter: (source) => shouldIncludeInReleaseZip(source),
   });
+  await copyFilterPluginConfigForZip({ projectRoot, stagingDir });
+  await restoreDescriptorPlatformListsForZip({ projectRoot, stagingDir, pluginName });
 }
 
 export function runUatProcessInvocation(runUatPath, args, { platform = process.platform } = {}) {
@@ -2434,7 +2480,7 @@ async function buildWithRunUat({ projectRoot, engine, projectConfig, globalConfi
   }
 
   await removeDirectoryIfExists(zipPath);
-  await copyReleasePackageForZip({ sourceDir: packageDir, stagingDir: zipStagingDir });
+  await copyReleasePackageForZip({ sourceDir: packageDir, stagingDir: zipStagingDir, projectRoot, pluginName });
   const zipInvocation = zipDirectoryProcessInvocation(zipStagingDir, zipPath);
   const compress = spawnSync(zipInvocation.command, zipInvocation.args, {
     cwd: projectRoot,

@@ -1001,23 +1001,69 @@ test("codexProcessInvocation runs executable Codex binaries directly", () => {
   });
 });
 
-test("copyReleasePackageForZip excludes pdb debug symbols from release zips", async () => {
+test("copyReleasePackageForZip excludes generated folders and includes FilterPlugin.ini", async () => {
   const root = await tempDir("release-zip-filter");
+  const projectRoot = path.join(root, "ProjectRoot");
   const source = path.join(root, "DiffPlus-UE5.7");
   const staging = path.join(root, "zip-staging", "DiffPlus-UE5.7");
   await mkdir(path.join(source, "Binaries", "Win64"), { recursive: true });
+  await mkdir(path.join(source, "Intermediate", "Build"), { recursive: true });
   await mkdir(path.join(source, "Resources"), { recursive: true });
+  await mkdir(path.join(source, "Source", "DiffPlus"), { recursive: true });
+  await mkdir(path.join(projectRoot, "Config"), { recursive: true });
   await writeFile(path.join(source, "Binaries", "Win64", "UnrealEditor-DiffPlus.dll"), "dll", "utf8");
   await writeFile(path.join(source, "Binaries", "Win64", "UnrealEditor-DiffPlus.pdb"), "symbols", "utf8");
   await writeFile(path.join(source, "Binaries", "Win64", "ExtraSymbols.PDB"), "symbols", "utf8");
   await writeFile(path.join(source, "Binaries", "Win64", "UnrealEditor.modules"), "modules", "utf8");
+  await writeFile(path.join(source, "Intermediate", "Build", "UnrealEditor-DiffPlus.lib"), "lib", "utf8");
   await writeFile(path.join(source, "Resources", "Icon128.png"), "icon", "utf8");
+  await writeFile(path.join(source, "Source", "DiffPlus", "DiffPlus.Build.cs"), "build", "utf8");
+  await writeFile(path.join(projectRoot, "Config", "FilterPlugin.ini"), "/Documentation/...\n", "utf8");
+  await writeFile(
+    path.join(projectRoot, "DiffPlus.uplugin"),
+    JSON.stringify({
+      Modules: [
+        {
+          Name: "DiffPlus",
+          PlatformAllowList: ["Win64"],
+        },
+      ],
+    }),
+    "utf8",
+  );
+  await writeFile(
+    path.join(source, "DiffPlus.uplugin"),
+    JSON.stringify({
+      EngineVersion: "4.27.0",
+      Modules: [
+        {
+          Name: "DiffPlus",
+        },
+      ],
+    }),
+    "utf8",
+  );
 
-  await copyReleasePackageForZip({ sourceDir: source, stagingDir: staging });
+  await copyReleasePackageForZip({ sourceDir: source, stagingDir: staging, projectRoot, pluginName: "DiffPlus" });
 
-  await stat(path.join(staging, "Binaries", "Win64", "UnrealEditor-DiffPlus.dll"));
-  await stat(path.join(staging, "Binaries", "Win64", "UnrealEditor.modules"));
   await stat(path.join(staging, "Resources", "Icon128.png"));
+  await stat(path.join(staging, "Source", "DiffPlus", "DiffPlus.Build.cs"));
+  assert.equal(
+    await readFile(path.join(staging, "Config", "FilterPlugin.ini"), "utf8"),
+    "/Documentation/...\n",
+  );
+  assert.deepEqual(JSON.parse(await readFile(path.join(staging, "DiffPlus.uplugin"), "utf8")), {
+    EngineVersion: "4.27.0",
+    Modules: [
+      {
+        Name: "DiffPlus",
+        PlatformAllowList: ["Win64"],
+      },
+    ],
+  });
+  await assert.rejects(stat(path.join(staging, "Binaries", "Win64", "UnrealEditor-DiffPlus.dll")));
+  await assert.rejects(stat(path.join(staging, "Binaries", "Win64", "UnrealEditor.modules")));
   await assert.rejects(stat(path.join(staging, "Binaries", "Win64", "UnrealEditor-DiffPlus.pdb")));
   await assert.rejects(stat(path.join(staging, "Binaries", "Win64", "ExtraSymbols.PDB")));
+  await assert.rejects(stat(path.join(staging, "Intermediate", "Build", "UnrealEditor-DiffPlus.lib")));
 });
